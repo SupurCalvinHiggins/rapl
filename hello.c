@@ -1,11 +1,14 @@
 #include <linux/module.h>
 #include <linux/printk.h>
 
+// https://sysprog21.github.io/lkmpg/#building-modules-for-a-precompiled-kernel
+// https://vincent.bernat.ch/en/blog/2017-linux-kernel-microbenchmark
+
 static struct kobject *hkello_kobj;
 
 static ssize_t khello_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
-    return scnprintf(buf, PAGE_SIZE, "Hello world!");
+    return scnprintf(buf, PAGE_SIZE, "Hello world!\n");
 }
 
 static struct kobj_attribute khello_attribute = __ATTR_RO(khello);
@@ -30,6 +33,7 @@ int init_module(void)
 
 void cleanup_module(void) 
 {
+    // TODO: Clean up.
     pr_info("khello: cleanup_module\n");
 }
 
