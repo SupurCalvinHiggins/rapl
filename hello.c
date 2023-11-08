@@ -4,7 +4,7 @@
 // https://sysprog21.github.io/lkmpg/#building-modules-for-a-precompiled-kernel
 // https://vincent.bernat.ch/en/blog/2017-linux-kernel-microbenchmark
 
-static struct kobject *hkello_kobj;
+static struct kobject *khello_kobj;
 
 static ssize_t khello_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
@@ -19,11 +19,11 @@ int init_module(void)
 
     pr_info("khello: init_module\n");
 
-    hkello_kobj = kobject_create_and_add("khello", kernel_kobj);
-    if (hkello_kobj == NULL)
+    khello_kobj = kobject_create_and_add("khello", kernel_kobj);
+    if (khello_kobj == NULL)
         return -ENOMEM;
     
-    err = sysfs_create_file(hkello_kobj, &khello_attribute.attr);
+    err = sysfs_create_file(khello_kobj, &khello_attribute.attr);
     if (err) {
         pr_info("failed to create the khello file in /sys/kernel/khello\n");
     }
@@ -34,6 +34,7 @@ int init_module(void)
 void cleanup_module(void) 
 {
     // TODO: Clean up.
+    kobject_put(khello_kobj);
     pr_info("khello: cleanup_module\n");
 }
 
