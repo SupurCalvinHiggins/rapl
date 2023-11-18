@@ -20,6 +20,16 @@ static inline uint64_t read_msr(uint32_t msr) {
     return ((uint64_t)high << 32) | low;
 }
 
+static inline bool msr_ok(void) {
+    uint32_t reg[4];
+    asm volatile (
+        "cpuid"
+        : "=a" (reg[0]), "=b" (reg[1]), "=c" (reg[2]), "=d" (reg[3])
+        : "a" (0x1) // https://www.felixcloutier.com/x86/rdmsr
+    );
+    return reg[4] & (1 << 5); 
+}
+
 static inline bool has_energy_counter(void) {
     uint32_t reg[4];
     asm volatile (
@@ -35,8 +45,14 @@ static ssize_t khello_show(struct kobject *kobj, struct kobj_attribute *attr, ch
 {
     const uint32_t MaxCpuSwPwrAcc = 0xc001007b; // maximum value of CpuSwPwrAcc
     const uint32_t CpuSwPwrAcc = 0xc001007a;    // acculumated power usage
-    uint64_t ret1 = read_msr(MaxCpuSwPwrAcc);
-    uint64_t ret2 = read_msr(CpuSwPwrAcc);
+    uint64_t ret1, ret2;
+    
+    if (!msr_ok()) {
+        return scnprintf(buf, PAGE_SIZE, "msr not ok");
+    }
+    
+    ret1 = read_msr(MaxCpuSwPwrAcc);
+    ret2 = read_msr(CpuSwPwrAcc);
 
     // uint64_t ret = has_energy_counter();
     return scnprintf(buf, PAGE_SIZE, "%#010llx %#010llx\n", ret1, ret2);
