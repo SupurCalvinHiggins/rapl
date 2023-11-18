@@ -6,15 +6,31 @@
 
 static struct kobject *khello_kobj;
 
+static inline uint64_t read_msr(uint32_t msr) {
+    uint32_t low, high;
+    asm volatile (
+        "rdmsr"
+        : "=a" (low), "=d" (high),
+        : "c" (msr)
+    );
+    return ((uint64_t)high << 32) | low;
+}
+
+static inline bool has_energy_counter() {
+    uint32_t reg[4];
+    asm volatile (
+        "cpuid"
+        : "=a" (reg[0]), "=b" (reg[1]), "=c" (reg[2]), "=d" (reg[3])
+        : "a" (0x80000007) // Section 17.5 AMD64 arch programmer's manual volume 2.
+                           // bit 12 of EDX is flag indicating energy facilities
+    )
+    return reg[4] & (1 << 12); 
+}
+
 static ssize_t khello_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
-    int ret;
-    asm volatile (
-        "movl $10, %0"
-        : "=r" (ret)
-        :
-        :
-    );
+    // uint64_t ret = read_msr();
+    uint64_t ret = has_energy_counter();
     return scnprintf(buf, PAGE_SIZE, "%#010x\n", ret);
     // return scnprintf(buf, PAGE_SIZE, "Hello world!\n");
 }
