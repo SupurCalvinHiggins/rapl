@@ -10,7 +10,7 @@ static struct kobject *khello_kobj;
 //   MaxCpuSwPwrAcc MSR C001007b
 //   CpuSwPwrAcc MSR C001007a
 
-static inline void cpuid(uint32_t fn, uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d) {
+static inline void hello_cpuid(uint32_t fn, uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d) {
     asm volatile (
         "cpuid"
         : "=a" (*a), "=b" (*b), "=c" (*c), "=d" (*d)
@@ -18,7 +18,7 @@ static inline void cpuid(uint32_t fn, uint32_t* a, uint32_t* b, uint32_t* c, uin
     );
 }
 
-static inline void rdmsr(uint32_t msr, uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d) {
+static inline void hello_rdmsr(uint32_t msr, uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d) {
     asm volatile (
         "rdmsr"
         : "=a" (*a), "=b" (*b), "=c" (*c), "=d" (*d)
@@ -26,17 +26,17 @@ static inline void rdmsr(uint32_t msr, uint32_t* a, uint32_t* b, uint32_t* c, ui
     );
 }
 
-static inline bool cpuid_ok(void) {
+static inline bool hello_cpuid_ok(void) {
     return true;
 }
 
-static inline bool rdmsr_ok(void) {
+static inline bool hello_rdmsr_ok(void) {
     // Reading MSRs is ok if CPUID.01H:EDX[5] = 1 as per
     //      1. https://www.felixcloutier.com/x86/rdmsr
     const uint32_t fn = 0x00000001;
     const uint32_t mask = 1 << 5;
     uint32_t unused, d;
-    cpuid(fn, &unused, &unused, &unused, &d);
+    hello_cpuid(fn, &unused, &unused, &unused, &d);
     return d & mask;
 }
 
@@ -47,14 +47,14 @@ static inline uint32_t amd_energy_units(void) {
     const uint32_t offset = 8;
     const uint32_t mask = 0xF << offset;
     uint32_t unused, a;
-    rdmsr(msr, &a, &unused, &unused, &unused);
-    return (a & mask) >> shift;
+    hello_rdmsr(msr, &a, &unused, &unused, &unused);
+    return (a & mask) >> offset;
 }
 
 static inline uint32_t amd_energy(void) {
     const uint32_t msr = 0xc001029b; 
     uint32_t unused, a;
-    rdmsr(msr, &a, &unused, &unused, &unused);
+    hello_rdmsr(msr, &a, &unused, &unused, &unused);
     return a;
 }
 
@@ -69,14 +69,14 @@ static inline uint32_t intel_energy_units(void) {
     const uint32_t offset = 8;
     const uint32_t mask = 0xF << offset;
     uint32_t unused, a;
-    rdmsr(msr, &a, &unused, &unused, &unused);
-    return (a & mask) >> shift;
+    hello_rdmsr(msr, &a, &unused, &unused, &unused);
+    return (a & mask) >> offset;
 }
 
 static inline uint32_t intel_energy(void) {
     const uint32_t msr = 0x00000611; // MSR_PKG_ENERGY_STATUS. https://github.com/torvalds/linux/blob/b8f1fa2419c19c81bc386a6b350879ba54a573e1/arch/x86/include/asm/msr-index.h#L392
     uint32_t unused, a;
-    rdmsr(msr, &a, &unused, &unused, &unused);
+    hello_rdmsr(msr, &a, &unused, &unused, &unused);
     return a;
 }
 
@@ -93,18 +93,18 @@ static ssize_t khello_show(struct kobject *kobj, struct kobj_attribute *attr, ch
 {
     uint32_t energy, energy_units;
 
-    if (!cpuid_ok()) {
+    if (!hello_cpuid_ok()) {
         return scnprintf(buf, PAGE_SIZE, "cpuid failed\n");
     }
 
-    if (!rdmsr_ok()) {
+    if (!hello_rdmsr_ok()) {
         return scnprintf(buf, PAGE_SIZE, "rdmsr failed\n");
     }
 
     energy = amd_energy();
     energy_units = amd_energy_units();
 
-    return scnprintf(buf, PAGE_SIZE, "energy = %#010llx\nenergy_units = %#010llx\n", energy, energy_units);
+    return scnprintf(buf, PAGE_SIZE, "energy = %#010x\nenergy_units = %#010x\n", energy, energy_units);
 }
 
 static struct kobj_attribute khello_attribute = __ATTR_RO(khello);
