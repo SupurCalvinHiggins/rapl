@@ -8,7 +8,15 @@ static struct kobject *khello_kobj;
 
 static ssize_t khello_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
-    return scnprintf(buf, PAGE_SIZE, "Hello world!\n");
+    int ret;
+    asm volatile (
+        "movl $10, %0"
+        : "=r" (ret)
+        :
+        :
+    );
+    return scnprintf(buf, PAGE_SIZE, "%#010x\n", ret);
+    // return scnprintf(buf, PAGE_SIZE, "Hello world!\n");
 }
 
 static struct kobj_attribute khello_attribute = __ATTR_RO(khello);
@@ -33,9 +41,8 @@ int init_module(void)
 
 void cleanup_module(void) 
 {
-    // TODO: Clean up.
-    kobject_put(khello_kobj);
     pr_info("khello: cleanup_module\n");
+    kobject_put(khello_kobj);
 }
 
 MODULE_LICENSE("GPL");
