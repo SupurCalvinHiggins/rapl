@@ -6,6 +6,10 @@
 
 static struct kobject *khello_kobj;
 
+// https://www.kernel.org/doc/Documentation/hwmon/fam15h_power
+//   MaxCpuSwPwrAcc MSR C001007b
+//   CpuSwPwrAcc MSR C001007a
+
 static inline uint64_t read_msr(uint32_t msr) {
     uint32_t low, high;
     asm volatile (
@@ -29,9 +33,13 @@ static inline bool has_energy_counter(void) {
 
 static ssize_t khello_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
-    // uint64_t ret = read_msr();
-    uint64_t ret = has_energy_counter();
-    return scnprintf(buf, PAGE_SIZE, "%#010llx\n", ret);
+    const uint32_t MaxCpuSwPwrAcc = 0xc001007b; // maximum value of CpuSwPwrAcc
+    const uint32_t CpuSwPwrAcc = 0xc001007a;    // acculumated power usage
+    uint64_t ret1 = read_msr(MaxCpuSwPwrAcc);
+    uint64_t ret2 = read_msr(CpuSwPwrAcc);
+
+    // uint64_t ret = has_energy_counter();
+    return scnprintf(buf, PAGE_SIZE, "%#010llx %#010llx\n", ret1, ret2);
     // return scnprintf(buf, PAGE_SIZE, "Hello world!\n");
 }
 
