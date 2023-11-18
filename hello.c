@@ -10,53 +10,98 @@ static struct kobject *khello_kobj;
 //   MaxCpuSwPwrAcc MSR C001007b
 //   CpuSwPwrAcc MSR C001007a
 
-static inline uint64_t read_msr(uint32_t msr) {
-    uint32_t low, high;
+static inline void cpuid(uint32_t fn, uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d) {
+    asm volatile (
+        "cpuid"
+        : "=a" (*a), "=b" (*b), "=c" (*c), "=d" (*d)
+        : "a" (fn)
+    );
+}
+
+static inline void rdmsr(uint32_t msr, uint32_t* a, uint32_t* b, uint32_t* c, uint32_t* d) {
     asm volatile (
         "rdmsr"
-        : "=a" (low), "=d" (high)
+        : "=a" (*a), "=b" (*b), "=c" (*c), "=d" (*d)
         : "c" (msr)
     );
-    return ((uint64_t)high << 32) | low;
 }
 
-static inline bool msr_ok(void) {
-    uint32_t reg[4];
-    asm volatile (
-        "cpuid"
-        : "=a" (reg[0]), "=b" (reg[1]), "=c" (reg[2]), "=d" (reg[3])
-        : "a" (0x1) // https://www.felixcloutier.com/x86/rdmsr
-    );
-    return reg[4] & (1 << 5); 
+static inline bool cpuid_ok(void) {
+    return true;
 }
 
-static inline bool has_energy_counter(void) {
-    uint32_t reg[4];
-    asm volatile (
-        "cpuid"
-        : "=a" (reg[0]), "=b" (reg[1]), "=c" (reg[2]), "=d" (reg[3])
-        : "a" (0x80000007) // Section 17.5 AMD64 arch programmer's manual volume 2.
-                           // bit 12 of EDX is flag indicating energy facilities
-    );
-    return reg[4] & (1 << 12); 
+static inline bool rdmsr_ok(void) {
+    // Reading MSRs is ok if CPUID.01H:EDX[5] = 1 as per
+    //      1. https://www.felixcloutier.com/x86/rdmsr
+    const uint32_t fn = 0x00000001;
+    const uint32_t mask = 1 << 5;
+    uint32_t unused, d;
+    cpuid(fn, &unused, &unused, &unused, &d);
+    return d & mask;
+}
+
+// AMD
+
+// 15h and 16h
+static inline bool amd_energy_ok(void) {
+    // Reading energy MSRs is ok if CPUID.80000007H:EDX[12] = 1 as per
+    //      1. AMD64 Architecture Progammer's Manual, Volume 2, Section 17.5 
+    const uint32_t fn = 0x80000007;
+    const uint32_t mask = 1 << 12;
+    uint32_t unused, d;
+    cpuid(fn, &unused, &unused, &unused, &d);
+    return d & mask;  
+}
+
+static inline uint32_t amd_energy_acc(void) {
+    // CpuSwPwrAcc: https://www.kernel.org/doc/Documentation/hwmon/fam15h_power
+    uint32_t unused, a, d;
+    rdmsr(0xc001007a, &a, &unused, &unused, &d);
+    return ((uint64_t)d << 32) | a;
+}
+
+static inline uint32_t amd_energy_max(void) {
+    // MaxCpuSwPwrAcc: https://www.kernel.org/doc/Documentation/hwmon/fam15h_power
+    uint32_t unused, a, d;
+    rdmsr(0xc001007b, &a, &unused, &unused, &d);
+    return ((uint64_t)d << 32) | a;
+}
+
+// 17h
+
+// same as intel but different locations
+// c001_0299 rapl_power_unit, file:///home/calvin/snap/firefox/common/Downloads/AMD%20-%20Preliminary%20Processor%20Programming%20Reference%20(PPR)%20for%20AMD%20Family%2017h%20Models%2000h-0Fh%20Processors%20-%20Rev%201.14%20-%20April%2015th,%202017%20(54945).pdf
+// c001_029b pkg_energy_stat
+
+// Intel
+
+static inline uint32_t intel_energy_units(void) {
+    const uint32_t msr = 0x00000606; // MSR_RAPL_POWER_UNIT. https://github.com/torvalds/linux/blob/b8f1fa2419c19c81bc386a6b350879ba54a573e1/arch/x86/include/asm/msr-index.h#L392, https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-vol-3b-part-2-manual.pdf
+    const uint32_t offset = 8;
+    const uint32_t mask = 0xF << offset;
+    uint32_t unused, a;
+    rdmsr(msr, &a, &unused, &unused, &unused);
+    return (a & mask) >> shift;
+}
+
+static inline uint32_t intel_energy(void) {
+    const uint32_t msr = 0x00000611; // MSR_PKG_ENERGY_STATUS. https://github.com/torvalds/linux/blob/b8f1fa2419c19c81bc386a6b350879ba54a573e1/arch/x86/include/asm/msr-index.h#L392
+    uint32_t unused, a;
+    rdmsr(msr, &a, &unused, &unused, &unused);
+    return a;
+}
+
+// Generic
+
+static inline uint32_t energy_sync(void) {
+    uint32_t start, end; 
+    start = intel_energy();
+    while ((end = intel_energy()) == start);
+    return end;
 }
 
 static ssize_t khello_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
-    // const uint32_t MaxCpuSwPwrAcc = 0xc001007b; // maximum value of CpuSwPwrAcc
-    // const uint32_t CpuSwPwrAcc = 0xc001007a;    // acculumated power usage
-    // uint64_t ret1, ret2;
-    
-    // if (!msr_ok()) {
-    //     return scnprintf(buf, PAGE_SIZE, "msr not ok");
-    // }
-
-    // ret1 = read_msr(MaxCpuSwPwrAcc);
-    // ret2 = read_msr(CpuSwPwrAcc);
-
-    // uint64_t ret = has_energy_counter();
-    // return scnprintf(buf, PAGE_SIZE, "%#010llx %#010llx\n", ret1, ret2);
-    // return scnprintf(buf, PAGE_SIZE, "Hello world!\n");
     return scnprintf(buf, PAGE_SIZE, "%#010llx\n", msr_ok());
 }
 
