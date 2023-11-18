@@ -42,32 +42,21 @@ static inline bool rdmsr_ok(void) {
 
 // AMD
 
-// 15h and 16h
-static inline bool amd_energy_ok(void) {
-    // Reading energy MSRs is ok if CPUID.80000007H:EDX[12] = 1 as per
-    //      1. AMD64 Architecture Progammer's Manual, Volume 2, Section 17.5 
-    const uint32_t fn = 0x80000007;
-    const uint32_t mask = 1 << 12;
-    uint32_t unused, d;
-    cpuid(fn, &unused, &unused, &unused, &d);
-    return d & mask;  
+static inline uint32_t amd_energy_units(void) {
+    const uint32_t msr = 0xc0010299; 
+    const uint32_t offset = 8;
+    const uint32_t mask = 0xF << offset;
+    uint32_t unused, a;
+    rdmsr(msr, &a, &unused, &unused, &unused);
+    return (a & mask) >> shift;
 }
 
-static inline uint32_t amd_energy_acc(void) {
-    // CpuSwPwrAcc: https://www.kernel.org/doc/Documentation/hwmon/fam15h_power
-    uint32_t unused, a, d;
-    rdmsr(0xc001007a, &a, &unused, &unused, &d);
-    return ((uint64_t)d << 32) | a;
+static inline uint32_t amd_energy(void) {
+    const uint32_t msr = 0xc001029b; 
+    uint32_t unused, a;
+    rdmsr(msr, &a, &unused, &unused, &unused);
+    return a;
 }
-
-static inline uint32_t amd_energy_max(void) {
-    // MaxCpuSwPwrAcc: https://www.kernel.org/doc/Documentation/hwmon/fam15h_power
-    uint32_t unused, a, d;
-    rdmsr(0xc001007b, &a, &unused, &unused, &d);
-    return ((uint64_t)d << 32) | a;
-}
-
-// 17h
 
 // same as intel but different locations
 // c001_0299 rapl_power_unit, file:///home/calvin/snap/firefox/common/Downloads/AMD%20-%20Preliminary%20Processor%20Programming%20Reference%20(PPR)%20for%20AMD%20Family%2017h%20Models%2000h-0Fh%20Processors%20-%20Rev%201.14%20-%20April%2015th,%202017%20(54945).pdf
@@ -102,7 +91,20 @@ static inline uint32_t energy_sync(void) {
 
 static ssize_t khello_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
-    return scnprintf(buf, PAGE_SIZE, "%#010llx\n", msr_ok());
+    uint32_t energy, energy_units;
+
+    if (!cpuid_ok()) {
+        return scnprintf(buf, PAGE_SIZE, "cpuid failed\n");
+    }
+
+    if (!rdmsr_ok()) {
+        return scnprintf(buf, PAGE_SIZE, "rdmsr failed\n");
+    }
+
+    energy = amd_energy();
+    energy_units = amd_energy_units();
+
+    return scnprintf(buf, PAGE_SIZE, "energy = %#010llx\nenergy_units = %#010llx\n", energy, energy_units);
 }
 
 static struct kobj_attribute khello_attribute = __ATTR_RO(khello);
