@@ -16,7 +16,7 @@ static inline uint64_t read_msr(uint32_t msr) {
     return ((uint64_t)high << 32) | low;
 }
 
-static inline bool has_energy_counter() {
+static inline bool has_energy_counter(void) {
     uint32_t reg[4];
     asm volatile (
         "cpuid"
