@@ -1,5 +1,5 @@
 #!/bin/bash
 make
-insmod hello.ko
-cat /sys/kernel/khello/khello
-rmmod hello
+insmod rcal.ko
+cat /sys/kernel/rcal/rcal_calibrate
+rmmod rcal

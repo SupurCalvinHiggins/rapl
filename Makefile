@@ -1,4 +1,4 @@
-obj-m += hello.o
+obj-m += rcal.o
 
 PWD = $(CURDIR)
 
