@@ -64,7 +64,7 @@ static inline bool rcal_rapl_ok(void) {
 // RAPL interface.
 
 static inline uint32_t rcal_rapl_units(void) {
-    const uint32_t mask = 0x00000F00;
+    const uint32_t mask = 0x00001F00;
     uint32_t unused, a;
     rcal_rdmsr(RCAL_RAPL_POWER_UNIT, &a, &unused, &unused, &unused);
     return (a & mask) >> 8;
@@ -97,15 +97,15 @@ static ssize_t rcal_calibrate_show(struct kobject *kobj, struct kobj_attribute *
     uint32_t units, start, end, count;
 
     if (!rcal_cpuid_ok()) {
-        return scnprintf(buf, PAGE_SIZE, "cpuid failed\n");
+        return scnprintf(buf, PAGE_SIZE, "{\"error\": \"cpuid failed\"}\n");
     }
 
     if (!rcal_rdmsr_ok()) {
-        return scnprintf(buf, PAGE_SIZE, "rdmsr failed\n");
+        return scnprintf(buf, PAGE_SIZE, "{\"error\": \"rdmsr failed\"}\n");
     }
 
     if (!rcal_rapl_ok()) {
-        return scnprintf(buf, PAGE_SIZE, "rapl failed\n");
+        return scnprintf(buf, PAGE_SIZE, "{\"error\": \"rapl failed\"}\n");
     }
 
     units = rcal_rapl_units();
@@ -114,7 +114,7 @@ static ssize_t rcal_calibrate_show(struct kobject *kobj, struct kobj_attribute *
     start = rcal_rapl_sync();
     end = rcal_rapl_sync_c(&count);
 
-    return scnprintf(buf, PAGE_SIZE, "units = %#010x\nstart = %#010x\nend = %#010x\ncount = %#010x\n", units, start, end, count);
+    return scnprintf(buf, PAGE_SIZE, "{\"units\": %u, \"start\": %u, \"end\": %u, \"count\": %u}\n", units, start, end, count);
 }
 
 static struct kobj_attribute rcal_attribute = __ATTR_RO(rcal_calibrate);
