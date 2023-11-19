@@ -61,6 +61,8 @@ static inline bool rcal_rapl_ok(void) {
 
 #endif
 
+// RAPL interface.
+
 static inline uint32_t rcal_rapl_units(void) {
     const uint32_t mask = 0x00000F00;
     uint32_t unused, a;
@@ -77,13 +79,22 @@ static inline uint32_t rcal_rapl_energy(void) {
 static inline uint32_t rcal_rapl_sync(void) {
     uint32_t start, end; 
     start = rcal_rapl_energy();
-    while ((end = rcal_rapl_sync()) == start);
+    while ((end = rcal_rapl_energy()) == start);
     return end;
 }
 
+static inline uint32_t rcal_rapl_sync_c(uint32_t* count) {
+    uint32_t start, end; 
+    start = rcal_rapl_energy();
+    while ((end = rcal_rapl_energy()) == start) (*count)++;
+    return end;
+}
+
+// Module interface.
+
 static ssize_t rcal_calibrate_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
 {
-    uint32_t energy, units;
+    uint32_t units, start, end, count;
 
     if (!rcal_cpuid_ok()) {
         return scnprintf(buf, PAGE_SIZE, "cpuid failed\n");
@@ -97,10 +108,13 @@ static ssize_t rcal_calibrate_show(struct kobject *kobj, struct kobj_attribute *
         return scnprintf(buf, PAGE_SIZE, "rapl failed\n");
     }
 
-    energy = rcal_rapl_energy();
     units = rcal_rapl_units();
 
-    return scnprintf(buf, PAGE_SIZE, "energy = %#010x\nunits = %#010x\n", energy, units);
+    count = 0;
+    start = rcal_rapl_sync();
+    end = rcal_rapl_sync_c(&count);
+
+    return scnprintf(buf, PAGE_SIZE, "units = %#010x\nstart = %#010x\nend = %#010x\ncount = %#010x\n", units, start, end, count);
 }
 
 static struct kobj_attribute rcal_attribute = __ATTR_RO(rcal_calibrate);
