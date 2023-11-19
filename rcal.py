@@ -49,9 +49,11 @@ def sync(args):
     data = []
     for _ in tqdm(range(args.samples)):
         sample = json.loads(source.read_text())
+        delta = (sample["end"] - sample["start"] if sample["end"] >= sample["start"] else ((1 << 32) - 1) - sample["end"] + sample["start"]) * (1_000 / (2 ** sample["units"]))
         datum = {
-            "delta": (sample["end"] - sample["start"] if sample["end"] >= sample["start"] else ((1 << 32) - 1) - sample["end"] + sample["start"]) * (1_000 / (2 ** sample["units"])),
+            "delta": delta,
             "count": sample["count"],
+            "delta_per_count": delta / sample["count"],
         }
         data.append(datum)
 
@@ -70,25 +72,25 @@ def sync(args):
     print(summary)
     summary.to_csv(out_summary, header=True)
 
-    out_hist = out_path.joinpath("hist.png")
-    fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(10, 6))
-    df[["delta"]].hist(ax=axes[0], bins=20)
-    axes[0].set_title("Energy Consumption")
-    axes[0].set_xlabel("Delta (nano-Joules)")
-    axes[0].set_ylabel("Bin Count")
-    df[["count"]].hist(ax=axes[1], bins=20)
-    axes[1].set_title("Increment Operations")
-    axes[1].set_xlabel("Count")
-    axes[1].set_ylabel("Bin Count")
-    plt.savefig(out_hist)
-    plt.show()
-
-    out_scatter = out_path.joinpath("scatter.png")
-    df.plot.scatter(x="count", y="delta")
-    plt.xlabel("Count")
-    plt.ylabel("Delta (nano-Joules)")
-    plt.title("Energy Consumption per Increment Operation")
-    plt.savefig(out_scatter)
+    out_plot = out_path.joinpath("plot.png")
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(20, 12))
+    df[["delta"]].hist(ax=axes[0, 0], bins=20)
+    axes[0, 0].set_title("Energy Consumption")
+    axes[0, 0].set_xlabel("Delta (nano-Joules)")
+    axes[0, 0].set_ylabel("Bin Count")
+    df[["count"]].hist(ax=axes[0, 1], bins=20)
+    axes[0, 1].set_title("Increment Operations")
+    axes[0, 1].set_xlabel("Count")
+    axes[0, 1].set_ylabel("Bin Count")
+    df[["delta_per_count"]].hist(ax=axes[1, 0], bins=20)
+    axes[1, 0].set_title("Energy Consumption per Increment Operation")
+    axes[1, 0].set_xlabel("Delta per Count (nano-Joules per increment)")
+    axes[1, 0].set_ylabel("Bin Count")
+    df.plot.scatter(ax=axes[1, 1], x="count", y="delta")
+    axes[1, 1].set_title("Energy Consumption per Increment Operation")
+    axes[1, 1].set_xlabel("Delta (nano-Joules)")
+    axes[1, 1].set_ylabel("Count")
+    plt.savefig(out_plot)
     plt.show()
 
 
