@@ -7,10 +7,6 @@ from pathlib import Path
 from datetime import datetime
 from tqdm import tqdm
 
-# TODO: Record kernel information like lscpu
-# TODO: Automatically generate output name with timestamp and type
-# TODO: print output name
-
 
 def lscpu():
     result = subprocess.run(["lscpu"], capture_output=True, text=True)
@@ -46,6 +42,7 @@ def sync(args):
         print(f"Error: rcal error: {error}")
         exit(1)
     
+    print("Data collection:")
     data = []
     for _ in tqdm(range(args.samples)):
         sample = json.loads(source.read_text())
@@ -69,11 +66,12 @@ def sync(args):
 
     out_summary = out_path.joinpath("summary.csv")
     summary = df.describe()
+    print("Summary statistics:")
     print(summary)
     summary.to_csv(out_summary, header=True)
 
     out_plot = out_path.joinpath("plot.png")
-    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(20, 12))
+    _, axes = plt.subplots(nrows=2, ncols=2, figsize=(20, 12))
     df[["delta"]].hist(ax=axes[0, 0], bins=20)
     axes[0, 0].set_title("Energy Consumption")
     axes[0, 0].set_xlabel("Delta (nano-Joules)")
@@ -88,8 +86,8 @@ def sync(args):
     axes[1, 0].set_ylabel("Bin Count")
     df.plot.scatter(ax=axes[1, 1], x="count", y="delta")
     axes[1, 1].set_title("Energy Consumption per Increment Operation")
-    axes[1, 1].set_xlabel("Delta (nano-Joules)")
-    axes[1, 1].set_ylabel("Count")
+    axes[1, 1].set_xlabel("Count")
+    axes[1, 1].set_ylabel("Delta (nano-Joules)")
     plt.savefig(out_plot)
     plt.show()
 
@@ -114,7 +112,6 @@ def main():
         exit(1)
     
     args.func(args)
-    print("OK")
 
 
 if __name__ == "__main__":
