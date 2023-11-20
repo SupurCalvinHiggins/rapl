@@ -109,10 +109,9 @@ def handle_time(args):
     data = []
     for _ in tqdm(range(args.samples)):
         sample = json.loads(source.read_text())
-        time = (sample["end"] - sample["start"] if sample["end"] >= sample["start"] else ((1 << 32) - 1) - sample["end"] + sample["start"])
+        time = (sample["end"] - sample["start"] if sample["end"] >= sample["start"] else ((1 << 32) - 1) - sample["end"] + sample["start"]) / 1000000
         datum = {
             "time": time,
-            "count": sample["count"],
         }
         data.append(datum)
     print()
@@ -130,15 +129,11 @@ def handle_time(args):
     print()
 
     out_plot = out_path.joinpath("plot.png")
-    _, axes = plt.subplots(nrows=1, ncols=2, figsize=(20, 12))
-    df[["time"]].hist(ax=axes[0], bins=20)
-    axes[0].set_title("Time Between Updates")
-    axes[0].set_xlabel("Time (???)")
-    axes[0].set_ylabel("Bin Count")
-    df[["count"]].hist(ax=axes[1], bins=20)
-    axes[1].set_title("Increment Operations")
-    axes[1].set_xlabel("Count")
-    axes[1].set_ylabel("Bin Count")
+    _, ax = plt.subplots(nrows=1, ncols=1, figsize=(20, 12))
+    df[["time"]].hist(ax=ax, bins=20)
+    ax.set_title("Time Between RAPL Updates")
+    ax.set_xlabel("Time (milliseconds)")
+    ax.set_ylabel("Bin Count")
     plt.savefig(out_plot)
     plt.show()
 

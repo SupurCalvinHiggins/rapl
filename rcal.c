@@ -1,5 +1,6 @@
 #include <linux/module.h>
 #include <linux/printk.h>
+#include <linux/ktime.h>
 
 static struct kobject *rcal_kobj;
 
@@ -117,7 +118,33 @@ static ssize_t rcal_calibrate_show(struct kobject *kobj, struct kobj_attribute *
     return scnprintf(buf, PAGE_SIZE, "{\"units\": %u, \"start\": %u, \"end\": %u, \"count\": %u}\n", units, start, end, count);
 }
 
-static struct kobj_attribute rcal_attribute = __ATTR_RO(rcal_calibrate);
+static struct kobj_attribute rcal_calibrate_attribute = __ATTR_RO(rcal_calibrate);
+
+static ssize_t rcal_time_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
+{
+    uint64_t start, end;
+
+    if (!rcal_cpuid_ok()) {
+        return scnprintf(buf, PAGE_SIZE, "{\"error\": \"cpuid failed\"}\n");
+    }
+
+    if (!rcal_rdmsr_ok()) {
+        return scnprintf(buf, PAGE_SIZE, "{\"error\": \"rdmsr failed\"}\n");
+    }
+
+    if (!rcal_rapl_ok()) {
+        return scnprintf(buf, PAGE_SIZE, "{\"error\": \"rapl failed\"}\n");
+    }
+
+    rcal_rapl_sync();
+    start = ktime_get_ns();
+    rcal_rapl_sync();
+    end = ktime_get_ns();
+
+    return scnprintf(buf, PAGE_SIZE, "{\"start\": %llu, \"end\": %llu}\n", start, end);
+}
+
+static struct kobj_attribute rcal_time_attribute = __ATTR_RO(rcal_time);
 
 int init_module(void) 
 {
@@ -129,9 +156,14 @@ int init_module(void)
     if (rcal_kobj == NULL)
         return -ENOMEM;
     
-    err = sysfs_create_file(rcal_kobj, &rcal_attribute.attr);
+    err = sysfs_create_file(rcal_kobj, &rcal_calibrate_attribute.attr);
     if (err) {
         pr_info("failed to create the rcal_calibrate file in /sys/kernel/rcal\n");
+    }
+
+    err = sysfs_create_file(rcal_kobj, &rcal_time_attribute.attr);
+    if (err) {
+        pr_info("failed to create the rcal_time file in /sys/kernel/rcal\n");
     }
 
     return 0;
