@@ -18,15 +18,14 @@ def uname():
     return result.stdout.strip()
 
 
-def sync(args):
+def init(mode):
     timestamp = datetime.now()
-    out_path = Path.cwd().joinpath(f"sync-{timestamp}")
+    out_path = Path.cwd().joinpath(f"{mode}-{timestamp}")
     if out_path.exists():
         print("Error: output path already exists")
         exit(1)
-    out_path.mkdir(parents=True, exist_ok=True)
 
-    source = Path("/sys/kernel/rcal/rcal_calibrate")
+    source = Path(f"/sys/kernel/rcal/rcal_{mode}")
     if not source.exists():
         print("Error: rcal module not loaded")
         exit(1)
@@ -42,6 +41,20 @@ def sync(args):
         print(f"Error: rcal error: {error}")
         exit(1)
     
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    out_platform = out_path.joinpath("lscpu.txt")
+    out_platform.write_text(lscpu())
+
+    out_platform = out_path.joinpath("uname.txt")
+    out_platform.write_text(uname())
+
+    return source, out_path
+
+
+def handle_calibrate(args):
+    source, out_path = init(args.mode)
+    
     print("Data collection:")
     data = []
     for _ in tqdm(range(args.samples)):
@@ -53,22 +66,19 @@ def sync(args):
             "delta_per_count": delta / sample["count"],
         }
         data.append(datum)
+    print()
 
     out_df = out_path.joinpath("data.csv")
     df = pd.DataFrame(data)
     df.to_csv(out_df, index=False)
 
-    out_platform = out_path.joinpath("lscpu.txt")
-    out_platform.write_text(lscpu())
-
-    out_platform = out_path.joinpath("uname.txt")
-    out_platform.write_text(uname())
-
     out_summary = out_path.joinpath("summary.csv")
     summary = df.describe()
+    summary.to_csv(out_summary, header=True)
+
     print("Summary statistics:")
     print(summary)
-    summary.to_csv(out_summary, header=True)
+    print()
 
     out_plot = out_path.joinpath("plot.png")
     _, axes = plt.subplots(nrows=2, ncols=2, figsize=(20, 12))
@@ -92,13 +102,60 @@ def sync(args):
     plt.show()
 
 
+def handle_time(args):
+    source, out_path = init(args.mode)
+    
+    print("Data collection:")
+    data = []
+    for _ in tqdm(range(args.samples)):
+        sample = json.loads(source.read_text())
+        time = (sample["end"] - sample["start"] if sample["end"] >= sample["start"] else ((1 << 32) - 1) - sample["end"] + sample["start"])
+        datum = {
+            "time": time,
+            "count": sample["count"],
+        }
+        data.append(datum)
+    print()
+    
+    out_df = out_path.joinpath("data.csv")
+    df = pd.DataFrame(data)
+    df.to_csv(out_df, index=False)
+
+    out_summary = out_path.joinpath("summary.csv")
+    summary = df.describe()
+    summary.to_csv(out_summary, header=True)
+
+    print("Summary statistics:")
+    print(summary)
+    print()
+
+    out_plot = out_path.joinpath("plot.png")
+    _, axes = plt.subplots(nrows=1, ncols=2, figsize=(20, 12))
+    df[["time"]].hist(ax=axes[0], bins=20)
+    axes[0].set_title("Time Between Updates")
+    axes[0].set_xlabel("Time (???)")
+    axes[0].set_ylabel("Bin Count")
+    df[["count"]].hist(ax=axes[1], bins=20)
+    axes[1].set_title("Increment Operations")
+    axes[1].set_xlabel("Count")
+    axes[1].set_ylabel("Bin Count")
+    plt.savefig(out_plot)
+    plt.show()
+
+
 def make_parser():
     parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(title="commands")
+    subparsers = parser.add_subparsers(title="mode")
 
-    sync_parser = subparsers.add_parser("sync")
-    sync_parser.add_argument("samples", type=int)
-    sync_parser.set_defaults(func=sync)
+    calibrate_parser = subparsers.add_parser("calibrate")
+    calibrate_parser.add_argument("samples", type=int)
+    calibrate_parser.set_defaults(mode="calibrate")
+    calibrate_parser.set_defaults(func=handle_calibrate)
+
+    time_parser = subparsers.add_parser("time")
+    time_parser.add_argument("samples", type=int)
+    time_parser.set_defaults(mode="time")
+    time_parser.set_defaults(func=handle_time)
 
     return parser
 
