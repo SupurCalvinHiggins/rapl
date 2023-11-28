@@ -26,9 +26,13 @@ static ssize_t rcal_calibrate_show(struct kobject *kobj, struct kobj_attribute *
 
     units = rcal_rapl_units();
 
+    preempt_disable();
+    local_irq_disable();
     count = 0;
     start = rcal_rapl_sync();
     end = rcal_rapl_sync_c(&count);
+    local_irq_enable();
+    preempt_enable();
 
     return scnprintf(buf, PAGE_SIZE, "{\"units\": %u, \"start\": %u, \"end\": %u, \"count\": %u}\n", units, start, end, count);
 }
@@ -51,10 +55,14 @@ static ssize_t rcal_time_show(struct kobject *kobj, struct kobj_attribute *attr,
         return scnprintf(buf, PAGE_SIZE, "{\"error\": \"rapl failed\"}\n");
     }
 
+    preempt_disable();
+    local_irq_disable();
     rcal_rapl_sync();
     start = ktime_get_ns();
     rcal_rapl_sync();
     end = ktime_get_ns();
+    local_irq_enable();
+    preempt_enable();
 
     return scnprintf(buf, PAGE_SIZE, "{\"start\": %llu, \"end\": %llu}\n", start, end);
 }
