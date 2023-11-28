@@ -7,6 +7,7 @@ from pathlib import Path
 from datetime import datetime
 from tqdm import tqdm
 
+# sudo cpupower frequency-set --governor performance
 
 def lscpu():
     result = subprocess.run(["lscpu"], capture_output=True, text=True)
