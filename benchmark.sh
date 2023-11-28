@@ -83,7 +83,7 @@ journalctl --boot --grep="\[RCAL\]" --since="${end_times[time]}" --until="${star
 # Files are in the format [77985.126714] debian kernel: [RCAL] {"start": 1686323097, "end": 1686324186, "count": 15811}
 # We want to convert it to 77985.126714,1686323097,1686324186,15811
 echo "Comma delimiting files..."
-sed -r -i 's/\[([0-9]+\.[0-9]+)\]  debian kernel: \[RCAL\] \{\"start\": ([0-9]+), \"end\": ([0-9]+), \"count\": ([0-9]+)\}/\1,\2,\3,\4/g' "$RESULTS_DIR"/dmesg_*.txt
+sed -r -i 's/\[\s*([0-9]+\.[0-9]+)\] debian kernel: \[RCAL\] \{\"start\": ([0-9]+), \"end\": ([0-9]+), \"count\": ([0-9]+)\}/\1,\2,\3,\4/g' "$RESULTS_DIR"/dmesg_*.txt
 
 # Move the dmest_*.txt files to dmesg_*.csv
 echo "Renaming files to .csv..."
