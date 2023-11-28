@@ -48,7 +48,7 @@ fi
 
 # Set up the result dir
 RESULTS_DIR="results/$(date +%Y-%m-%d-%H-%M-%S)"
-mkdir -p $RESULTS_DIR
+mkdir -p "$RESULTS_DIR"
 
 # Unload the module since it may have been updated
 if lsmod | grep -q rcal; then
@@ -71,11 +71,11 @@ sleep $SLEEP_TIME
 benchmark "sysbench --threads=$SYSBENCH_THREADS --time=$SYSBENCH_TIME --rand-seed=20 threads run" "sysbench" "$RESULTS_DIR"
 
 # Consolidate dmesg output
-cat $RESULTS_DIR/dmesg_*.txt > $RESULTS_DIR/dmesg.txt
-rm $RESULTS_DIR/dmesg_*.txt
+cat "$RESULTS_DIR"/dmesg_*.txt > "$RESULTS_DIR/dmesg.txt"
+rm "$RESULTS_DIR"/dmesg_*.txt
 
 # Sort the dmesg output by time and remove duplicates
-sort -n $RESULTS_DIR/dmesg.txt | uniq > $RESULTS_DIR/dmesg_sorted.txt
+sort -n "$RESULTS_DIR/dmesg.txt" | uniq > "$RESULTS_DIR/dmesg_sorted.txt"
 
 # Make the file comma delimited using sed
 # File is in the format [77985.126714] [RCAL] {"start": 1686323097, "end": 1686324186, "count": 15811}
@@ -83,29 +83,27 @@ sort -n $RESULTS_DIR/dmesg.txt | uniq > $RESULTS_DIR/dmesg_sorted.txt
 sed -r -i 's/\[([0-9]+\.[0-9]+)\] \[RCAL\] \{\"start\": ([0-9]+), \"end\": ([0-9]+), \"count\": ([0-9]+)\}/\1,\2,\3,\4/g' $RESULTS_DIR/dmesg_sorted.txt
 mv $RESULTS_DIR/dmesg_sorted.txt $RESULTS_DIR/dmesg_full.csv
 
-# Add headers
-sed -i '1s/^/time,start,end,count,end-start\n/' $RESULTS_DIR/dmesg_full.csv
-
 # Add a column for the difference between end and start in place
-awk -F, '{print $1","$2","$3","$4","$3-$2}' OFS=, $RESULTS_DIR/dmesg_full.csv > $RESULTS_DIR/dmesg_full.csv.tmp
-mv $RESULTS_DIR/dmesg_full.csv.tmp $RESULTS_DIR/dmesg_full.csv
-
-# Echo the start and end times for each benchmark
-echo "Start and end times for each benchmark:"
-echo "calibrate: ${start_times[calibrate]} ${end_times[calibrate]}"
-echo "time: ${start_times[time]} ${end_times[time]}"
-echo "sysbench: ${start_times[sysbench]} ${end_times[sysbench]}"
+awk -F, '{print $1","$2","$3","$4","$3-$2}' OFS=, "$RESULTS_DIR/dmesg_full.csv" > "$RESULTS_DIR/dmesg_full.csv.tmp"
+mv "$RESULTS_DIR/dmesg_full.csv.tmp" "$RESULTS_DIR/dmesg_full.csv"
 
 # Create dmesg_time.csv, dmesg_calibrate.csv, and dmesg_sysbench.csv
 # These files are the same as dmesg_full.csv but only contain the data for the corresponding benchmark
 # based on the start and end times
-awk -F, -v start=${start_times[time]} -v end=${end_times[time]} '{if ($1 >= start && $1 <= end) print $0}' OFS=, $RESULTS_DIR/dmesg_full.csv > $RESULTS_DIR/dmesg_time.csv
-awk -F, -v start=${start_times[calibrate]} -v end=${end_times[calibrate]} '{if ($1 >= start && $1 <= end) print $0}' OFS=, $RESULTS_DIR/dmesg_full.csv > $RESULTS_DIR/dmesg_calibrate.csv
-awk -F, -v start=${start_times[sysbench]} -v end=${end_times[sysbench]} '{if ($1 >= start && $1 <= end) print $0}' OFS=, $RESULTS_DIR/dmesg_full.csv > $RESULTS_DIR/dmesg_sysbench.csv
+awk -F, -v start=${start_times[time]} -v end=${end_times[time]} '{if ($1 >= start && $1 <= end) print $0}' OFS=, "$RESULTS_DIR/dmesg_full.csv" > "$RESULTS_DIR/dmesg_time.csv"
+awk -F, -v start=${start_times[calibrate]} -v end=${end_times[calibrate]} '{if ($1 >= start && $1 <= end) print $0}' OFS=, "$RESULTS_DIR/dmesg_full.csv" > "$RESULTS_DIR/dmesg_calibrate.csv"
+awk -F, -v start=${start_times[sysbench]} -v end=${end_times[sysbench]} '{if ($1 >= start && $1 <= end) print $0}' OFS=, "$RESULTS_DIR/dmesg_full.csv" > "$RESULTS_DIR/dmesg_sysbench.csv"
+
+# Create dmesg_sleep.csv which runs from the end of the time benchmark to the start of the sysbench benchmark
+awk -F, -v start=${end_times[time]} -v end=${start_times[sysbench]} '{if ($1 >= start && $1 <= end) print $0}' OFS=, "$RESULTS_DIR/dmesg_full.csv" > "$RESULTS_DIR/dmesg_sleep.csv"
+
+# Add headers for time,start,end,count,diff
+sed -i '1s/^/time,start,end,count,diff\n/' "$RESULTS_DIR"/dmesg_*.csv
+
 
 # Move time* and calibrate* directories to the results directory
-mv time* $RESULTS_DIR
-mv calibrate* $RESULTS_DIR
+mv time* "$RESULTS_DIR"
+mv calibrate* "$RESULTS_DIR"
 
 # Clean up
 rm "$RESULTS_DIR/dmesg.txt"
