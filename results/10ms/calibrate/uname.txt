@@ -1,0 +1,1 @@
+Linux debian 6.7.0rc2-analysis-10ms+ #30 SMP PREEMPT_DYNAMIC Tue Nov 28 14:50:30 EST 2023 x86_64 GNU/Linux
